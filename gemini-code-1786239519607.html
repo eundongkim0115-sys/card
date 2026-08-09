@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>디지털 명함 - 김은동 팀장</title>
+
+    <!-- [PWA Manifest 연동] -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- [iOS Safari 웹 앱 메타 태그] -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="내 명함">
+
+    <!-- [안드로이드 / 테마 색상] -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1e3a8a">
+
+    <!-- [앱 아이콘 - 동적 생성된 '김' 이니셜 SVG Data URI (별도 이미지 파일 없이 작동 가능)] -->
+    <!-- iOS 홈 화면 아이콘 (180x180) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'><rect width='100%' height='100%' fill='%231e3a8a'/><text x='50%' y='55%' font-family='sans-serif' font-weight='bold' font-size='90' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'>김</text></svg>">
+    
+    <!-- 안드로이드 / 파비콘 (192x192) -->
+    <link rel="icon" type="image/svg+xml" sizes="192x192" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='192' height='192' viewBox='0 0 192 192'><rect width='100%' height='100%' fill='%231e3a8a'/><text x='50%' y='55%' font-family='sans-serif' font-weight='bold' font-size='96' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'>김</text></svg>">
+
+    <!-- 명함 이미지(HTML-to-Image / html2canvas) 저장을 위한 캡처 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 20mm;
+            background-color: #f1f5f9;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            padding: 20px;
+            /* iOS 노치 영역(Safe Area) 대응 */
+            padding-top: max(20px, env(safe-area-inset-top));
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+        }
+
+        /* 언어 전환 버튼 스위치 */
+        .lang-switch-wrapper {
+            width: 100%;
+            max-width: 750px;
+            margin: 0 auto 16px auto;
+            text-align: right;
+        }
+
+        .lang-btn {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #64748b;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+
+        .lang-btn:hover {
+            border-color: #1e3a8a;
+            color: #1e3a8a;
+        }
+
+        .lang-btn.active {
+            background-color: #1e3a8a;
+            color: #ffffff;
+            border-color: #1e3a8a;
+        }
+
+        /* 명함 카드 메인 컨테이너 */
+        .card-wrapper {
+            width: 100%;
+            max-width: 750px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08);
+            border: 1px solid #e2e8f0;
+            padding: 40px;
+            display: table;
+            table-layout: fixed;
+        }
+
+        /* 왼쪽 영역: 기본 정보 */
+        .card-left {
+            display: table-cell;
+            width: 58%;
+            vertical-align: top;
+            padding-right: 25px;
+        }
+
+        /* 심볼 로고 */
+        .brand-header {
+            margin-bottom: 24px;
+        }
+
+        .logo-symbol {
+            display: inline-block;
+            width: 42px;
+            height: 42px;
+            line-height: 42px;
+            background-color: #1e3a8a;
+            color: #ffffff;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 800;
+            font-size: 18px;
+            letter-spacing: -0.5px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+
+        .company-name {
+            display: inline-block;
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e3a8a;
+            letter-spacing: -0.3px;
+            vertical-align: middle;
+        }
+
+        /* 인적 정보 */
+        .profile-info {
+            margin-bottom: 24px;
+        }
+
+        .name-title-group {
+            margin-bottom: 10px;
+        }
+
+        .name {
+            font-size: 32px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.8px;
+            margin-right: 10px;
+        }
+
+        .title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .tagline {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1e3a8a;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 6px;
+            margin-top: 8px;
+            margin-bottom: 20px;
+        }
+
+        /* 상세 연락처 */
+        .contact-list {
+            margin-top: 10px;
+        }
+
+        .contact-item {
+            margin-bottom: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .contact-label {
+            display: inline-block;
+            width: 70px;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .contact-value {
+            display: inline-block;
+            color: #1e293b;
+            font-weight: 500;
+        }
+
+        .contact-value a {
+            color: #1e293b;
+            text-decoration: none;
+        }
+
+        /* 오른쪽 영역: QR & 인증 */
+        .card-right {
+            display: table-cell;
+            width: 42%;
+            vertical-align: top;
+            background: #f8fafc;
+            border: 1px solid #f1f5f9;
+            border-radius: 16px;
+            padding: 24px 16px;
+            text-align: center;
+        }
+
+        .qr-box {
+            background: #ffffff;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            margin: 0 auto 12px auto;
+            width: 164px;
+            height: 164px;
+            text-align: center;
+        }
+
+        .qr-box img {
+            width: 140px;
+            height: 140px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .qr-desc {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 14px;
+        }
+
+        .cert-info {
+            font-size: 11px;
+            color: #94a3b8;
+            line-height: 1.5;
+            word-break: keep-all;
+        }
+
+        /* 하단 액션 버튼 그룹 */
+        .btn-container {
+            width: 100%;
+            max-width: 750px;
+            margin: 20px auto 0 auto;
+            display: table;
+            table-layout: fixed;
+            border-spacing: 12px 0;
+        }
+
+        .btn {
+            display: table-cell;
+            text-align: center;
+            vertical-align: middle;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-save {
+            background-color: #1e3a8a;
+            color: #ffffff;
+        }
+
+        .btn-save:hover {
+            background-color: #172554;
+        }
+
+        .btn-call {
+            background-color: #ffffff;
+            color: #1e293b;
+            border: 1px solid #cbd5e1;
+        }
+
+        .btn-call:hover {
+            background-color: #f8fafc;
+        }
+
+        /* 모바일 대응 반응형 */
+        @media (max-width: 640px) {
+            .card-wrapper {
+                display: block;
+                padding: 24px;
+            }
+            .card-left, .card-right {
+                display: block;
+                width: 100%;
+                padding-right: 0;
+            }
+            .card-right {
+                margin-top: 24px;
+            }
+            .btn-container {
+                display: block;
+            }
+            .btn {
+                display: block;
+                width: 100%;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 언어 전환 스위치 버튼 -->
+    <div class="lang-switch-wrapper">
+        <button id="btn-ko" class="lang-btn active" onclick="setLanguage('ko')">한국어</button>
+        <button id="btn-en" class="lang-btn" onclick="setLanguage('en')">English</button>
+    </div>
+
+    <!-- 명함 카드 UI (이미지 저장 영역) -->
+    <div class="card-wrapper" id="card-to-capture">
+        <div class="card-left">
+            <div class="brand-header">
+                <div class="logo-symbol">NFC</div>
+                <div class="company-name" id="txt-company">주식회사 남방에프씨</div>
+            </div>
+
+            <div class="profile-info">
+                <div class="name-title-group">
+                    <span class="name" id="txt-name">김은동</span>
+                    <span class="title" id="txt-title">자재팀장</span>
+                </div>
+                <div class="tagline" id="txt-tagline">자재 관리 &amp; 스프레이 디자인 전문</div>
+            </div>
+
+            <div class="contact-list">
+                <div class="contact-item">
+                    <span class="contact-label" id="lbl-mobile">휴대폰</span>
+                    <span class="contact-value"><a href="tel:01031352266">010-3135-2266</a></span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-label" id="lbl-tel">전화</span>
+                    <span class="contact-value"><a href="tel:0415317585" id="txt-tel-val">041-531-7585 (1공장)</a></span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-label" id="lbl-email">이메일</span>
+                    <span class="contact-value"><a href="mailto:kimed@spraydesign.co.kr">kimed@spraydesign.co.kr</a></span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-label" id="lbl-web">웹사이트</span>
+                    <span class="contact-value"><a href="http://spraydesign.co.kr" target="_blank">spraydesign.co.kr</a></span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-label" id="lbl-addr">주소</span>
+                    <span class="contact-value" id="txt-addr-val">충남 아산시 둔포면 아산밸리남로 52</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-right">
+            <!-- QR 코드 이미지 -->
+            <div class="qr-box">
+                <img id="qr-img" src="" alt="vCard QR Code">
+            </div>
+            <div class="qr-desc" id="txt-qr-desc">스캔 시 연락처 자동 저장</div>
+            <div class="cert-info" id="txt-cert-info">
+                ISO 9001 · 14001 · 22716<br>
+                CGMP / INNO-BIZ 인증
+            </div>
+        </div>
+    </div>
+
+    <!-- 하단 액션 버튼 -->
+    <div class="btn-container">
+        <div class="btn btn-save" id="btn-save-img" onclick="saveCardImage()">명함 저장 (이미지)</div>
+        <a class="btn btn-call" href="tel:01031352266">Tel: 010-3135-2266</a>
+    </div>
+
+    <script>
+        // [서비스 워커 등록 (오프라인 지원)]
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .catch((err) => console.log('SW registration failed:', err));
+            });
+        }
+
+        const cardData = {
+            ko: {
+                name: "김은동",
+                title: "자재팀장",
+                company: "주식회사 남방에프씨",
+                tagline: "자재 관리 & 스프레이 디자인 전문",
+                lblMobile: "휴대폰",
+                lblTel: "전화",
+                telVal: "041-531-7585 (1공장)",
+                lblEmail: "이메일",
+                lblWeb: "웹사이트",
+                lblAddr: "주소",
+                addrVal: "충남 아산시 둔포면 아산밸리남로 52",
+                qrDesc: "스캔 시 연락처 자동 저장",
+                certInfo: "ISO 9001 · 14001 · 22716<br>CGMP / INNO-BIZ 인증",
+                btnSaveImg: "명함 저장 (이미지)",
+                vcard: {
+                    n: "김;은동;;;",
+                    fn: "김은동",
+                    org: "주식회사 남방에프씨",
+                    title: "자재팀장",
+                    telCell: "010-3135-2266",
+                    telWork: "041-531-7585",
+                    email: "kimed@spraydesign.co.kr",
+                    url: "http://spraydesign.co.kr",
+                    adr: ";;충남 아산시 둔포면 아산밸리남로 52;;;;"
+                }
+            },
+            en: {
+                name: "Eundong Kim",
+                title: "Materials Manager",
+                company: "Nambang FC Co., Ltd.",
+                tagline: "Materials Management & Spray Design",
+                lblMobile: "Mobile",
+                lblTel: "Tel",
+                telVal: "+82-41-531-7585 (Plant 1)",
+                lblEmail: "Email",
+                lblWeb: "Website",
+                lblAddr: "Address",
+                addrVal: "52, Asanvalley-namro, Dunpo-myeon, Asan-si, Chungcheongnam-do, Korea",
+                qrDesc: "Scan to Save Contact",
+                certInfo: "ISO 9001 · 14001 · 22716<br>CGMP / INNO-BIZ Certified",
+                btnSaveImg: "Save Card (Image)",
+                vcard: {
+                    n: "Kim;Eundong;;;",
+                    fn: "Eundong Kim",
+                    org: "Nambang FC Co., Ltd.",
+                    title: "Materials Manager",
+                    telCell: "+82-10-3135-2266",
+                    telWork: "+82-41-531-7585",
+                    email: "kimed@spraydesign.co.kr",
+                    url: "http://spraydesign.co.kr",
+                    adr: ";;52, Asanvalley-namro, Dunpo-myeon, Asan-si, Chungcheongnam-do;;;;Korea"
+                }
+            }
+        };
+
+        let currentLang = 'ko';
+
+        function generateQRUrl(vcard) {
+            const vcardStr = `BEGIN:VCARD\nVERSION:3.0\nN:${vcard.n}\nFN:${vcard.fn}\nORG:${vcard.org}\nTITLE:${vcard.title}\nTEL;TYPE=CELL:${vcard.telCell}\nTEL;TYPE=WORK,VOICE:${vcard.telWork}\nEMAIL;TYPE=INTERNET:${vcard.email}\nURL:${vcard.url}\nADR;TYPE=WORK:${vcard.adr}\nEND:VCARD`;
+            const encoded = encodeURIComponent(vcardStr);
+            return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encoded}`;
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            const data = cardData[lang];
+
+            document.getElementById('txt-name').textContent = data.name;
+            document.getElementById('txt-title').textContent = data.title;
+            document.getElementById('txt-company').textContent = data.company;
+            document.getElementById('txt-tagline').textContent = data.tagline;
+
+            document.getElementById('lbl-mobile').textContent = data.lblMobile;
+            document.getElementById('lbl-tel').textContent = data.lblTel;
+            document.getElementById('txt-tel-val').textContent = data.telVal;
+            document.getElementById('lbl-email').textContent = data.lblEmail;
+            document.getElementById('lbl-web').textContent = data.lblWeb;
+            document.getElementById('lbl-addr').textContent = data.lblAddr;
+            document.getElementById('txt-addr-val').textContent = data.addrVal;
+
+            document.getElementById('txt-qr-desc').textContent = data.qrDesc;
+            document.getElementById('txt-cert-info').innerHTML = data.certInfo;
+            document.getElementById('btn-save-img').textContent = data.btnSaveImg;
+
+            document.getElementById('btn-ko').classList.toggle('active', lang === 'ko');
+            document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+
+            const qrImg = document.getElementById('qr-img');
+            const qrUrl = generateQRUrl(data.vcard);
+            qrImg.src = qrUrl;
+            qrImg.onerror = function() {
+                this.src = `https://quickchart.io/qr?text=${encodeURIComponent(`BEGIN:VCARD\nVERSION:3.0\nN:${data.vcard.n}\nFN:${data.vcard.fn}\nORG:${data.vcard.org}\nTITLE:${data.vcard.title}\nTEL;TYPE=CELL:${data.vcard.telCell}\nTEL;TYPE=WORK,VOICE:${data.vcard.telWork}\nEMAIL;TYPE=INTERNET:${data.vcard.email}\nURL:${data.vcard.url}\nADR;TYPE=WORK:${data.vcard.adr}\nEND:VCARD`)}&size=220&margin=1`;
+            };
+        }
+
+        function saveCardImage() {
+            const cardElement = document.getElementById('card-to-capture');
+            html2canvas(cardElement, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff'
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `BusinessCard_${cardData[currentLang].name}_${currentLang.toUpperCase()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        }
+
+        window.onload = function() {
+            setLanguage('ko');
+        };
+    </script>
+</body>
+</html>
